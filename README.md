@@ -264,6 +264,5 @@ See its license and the model licenses you deploy.
 
 ## License
 
-MIT (project code). Models remain under their respective licenses.
-
----# Faster-Whisper-API
+MIT — applies to this repository’s source code.
+Upstream libraries and any pretrained models retain their own licenses.
