@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, UploadFile, File, BackgroundTasks, Depen
 from fastapi.responses import JSONResponse
 from pathlib import Path
 import tempfile, os, asyncio, time, logging
-from ..deps import get_model
+from ..dependencies import get_model
 from ..services.transcriber import TranscriptionService
 from ..services.audio_processor import AudioProcessor
 from ..config.settings import settings
