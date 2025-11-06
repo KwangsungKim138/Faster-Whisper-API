@@ -33,10 +33,12 @@ Designed for **inference-only** on an internal server: upload an audio/video fil
 Faster-Whisper-API/
 ├─ app/
 │  ├─ main.py
-│  ├─ deps.py                 # WhisperModel singleton
-│  ├─ routers/
-│  │   └─ transcribe.py       # /transcribe, /health
+│  ├─ dependencies.py         # WhisperModel singleton
+│  ├─ jobs.py
+│  ├─ middleware.py
 │  ├─ schemas.py              # Pydantic I/O models
+│  ├─ routers/
+│  │   └─ transcribe_async.py # /transcribe_async, /health
 │  ├─ services/
 │  │   ├─ transcriber.py
 │  │   └─ audio_processor.py
@@ -85,12 +87,12 @@ curl http://localhost:8000/health
 
 ## API
 
-### POST `/transcribe`
+### POST `/transcribe_async`
 
 **Form data**
 
-* `file` (required): audio/video file (`.wav`, `.mp3`, `.mp4`, `.mkv`, `.mov`, `.m4a`, `.ogg`, …)
-* `query` (JSON string, optional):
+* `file` *(required)*: audio/video file (`.wav`, `.mp3`, `.mp4`, `.mkv`, `.mov`, `.m4a`, `.ogg`, …)
+* `query` *(JSON string, optional)*:
 
   * `request_id`: string
   * `language`: default `"ko"`
@@ -100,33 +102,125 @@ curl http://localhost:8000/health
   * `vad`: bool, default `true`
   * `word_timestamps`: bool, default `false`
 
-**Response**
 
-```json
-{
-  "id": "uuid",
-  "request_id": "optional",
-  "language": "ko",
-  "duration": 123.45,
-  "created_at": "YYYY-MM-DD HH:MM:SS.mmm",
-  "result": {
-    "text": "full transcription text ...",
-    "segments": [
-      { "index": 0, "start": 0.50, "end": 2.10, "content": "..." }
-    ]
+**Response (202 + Location header)**
+
+* **Status**: `202 Accepted`
+* **Headers**:
+
+  * `Location: /jobs/<job_id>`
+  * `X-Request-ID: <same-as-request-or-job_id>`
+* **Body**:
+
+  ```json
+  {
+    "job_id": "12345678-a1b2-c3d4-e5f6-g7h8i9j0k1l2",
+    "status_url": "/jobs/12345678-a1b2-c3d4-e5f6-g7h8i9j0k1l2"
   }
-}
-```
+  ```
 
-**cURL example**
+
+**cURL**
 
 ```bash
-curl -X POST "http://localhost:8000/transcribe" \
-  -F "file=@/path/to/sample.wav" \
-  -F 'query={"language":"ko","vad":true,"word_timestamps":false}'
+curl -X POST "http://localhost:8000/transcribe_async" \
+  -F "file=@/path/to/sample.mp3" \
+  -F 'query={"language":"ko","vad":true,"word_timestamps":false}' -i
+# HTTP/1.1 202 Accepted
+# Location: /jobs/<job_id>
+# ...
+# {"job_id":"<job_id>","status_url":"/jobs/<job_id>"}
 ```
 
 ---
+
+
+### GET `/jobs/{job_id}`
+
+Fetch the job status. While processing, `progress` updates; when finished, the transcription result is included.
+
+**Responses (examples)**
+
+* **queued**
+
+  ```json
+  {
+    "job_id": "<job_id>",
+    "status": "queued",
+    "started_at": null,
+    "ended_at": null,
+    "progress": 0.0,
+    "message": "",
+    "result": null,
+    "request_id": null
+  }
+  ```
+
+* **processing**
+
+  ```json
+  {
+    "job_id": "<job_id>",
+    "status": "processing",
+    "started_at": 1762409945.60871,
+    "ended_at": null,
+    "progress": 0.2874,
+    "message": "transcribing",
+    "result": null,
+    "request_id": null
+  }
+  ```
+
+* **done**
+
+  ```json
+  {
+    "job_id": "<job_id>",
+    "status": "done",
+    "started_at": 1762409945.60871,
+    "ended_at": 1762410345.10293,
+    "progress": 1.0,
+    "message": "done",
+    "result": {
+      "language": "ko",
+      "duration": 2926.59,
+      "result": {
+        "text": "full transcription text ...",
+        "segments": [
+          { "index": 0, "start": 0.50, "end": 2.10, "content": "..." }
+        ]
+      }
+    },
+    "request_id": null
+  }
+  ```
+
+* **error**
+
+  ```json
+  {
+    "job_id": "<job_id>",
+    "status": "error",
+    "started_at": 1762409945.60871,
+    "ended_at": 1762410001.00412,
+    "progress": 0.0,
+    "message": "error details ...",
+    "result": null,
+    "request_id": null
+  }
+  ```
+
+**cURL**
+
+```bash
+curl "http://localhost:8000/jobs/<job_id>"
+```
+
+> **Note:** To throttle GPU load and request bursts, tune the queue/concurrency via environment variables:
+> `FW_MAX_CONCURRENCY` (per-GPU concurrent jobs), `FW_QUEUE_MAXSIZE` (pending queue size), `FW_RETRY_AFTER` (seconds for 503 Retry-After).
+
+---
+
 
 ## Configuration
 
@@ -138,7 +232,7 @@ curl -X POST "http://localhost:8000/transcribe" \
 * `DEFAULT_CH`: 1
 * `MAX_CHUNK_DURATION_MS`: e.g., 2h05m
 
-`app/deps.py` (model init)
+`app/dependencies.py` (model init)
 
 * `model_name`: `"large-v3"`, `"medium"`, etc.
 * `device`: `"cuda"` **or** `"cpu"`
@@ -153,7 +247,7 @@ curl -X POST "http://localhost:8000/transcribe" \
 
 ## Selecting GPU vs CPU
 
-You can force the backend via environment variables (read by `deps.py`) or by editing `WhisperFactory`:
+You can force the backend via environment variables (read by `dependencies.py`) or by editing `WhisperFactory`:
 
 ```bash
 # CPU mode (no CUDA required)
@@ -167,7 +261,7 @@ export FW_COMPUTE=float16   # or int8_float16
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Example `deps.py` snippet:
+Example `dependencies.py` snippet:
 
 ```python
 import os
@@ -197,44 +291,121 @@ def get_model() -> WhisperModel:
 
 ## Docker
 
-### CUDA (GPU)
+### GPU (CUDA)
+
+**Dockerfile (GPU)**
 
 ```dockerfile
-FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
-ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
-RUN apt-get update && apt-get install -y python3-pip python3-dev ffmpeg && rm -rf /var/lib/apt/lists/*
+# CUDA + cuDNN runtime (Ubuntu 24.04)
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu24.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# System dependencies (Python, ffmpeg, build tools for wheels like PyAV)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-venv python3-pip python3-dev \
+    ffmpeg \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# App
 WORKDIR /srv/app
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN python3 -m venv /opt/venv && . /opt/venv/bin/activate \
+ && pip install --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
+
 COPY app ./app
 EXPOSE 8000
+
+# One model instance, one worker
+ENV PATH="/opt/venv/bin:$PATH"
 CMD ["uvicorn","app.main:app","--host","0.0.0.0","--port","8000","--workers","1"]
 ```
 
-Run:
+**Build**
 
 ```bash
-docker build -t faster-whisper-api .
-docker run --gpus all -p 8000:8000 \
-  -e FW_DEVICE=cuda -e FW_COMPUTE=float16 \
-  faster-whisper-api
+docker build -t faster-whisper-api:gpu .
 ```
+
+**Run**
+
+```bash
+docker run --gpus all -p 8000:8000 \
+  -e FW_DEVICE=cuda \
+  -e FW_COMPUTE=float16 \
+  -e FW_MODEL=large-v3 \
+  -v /opt/whisper-cache:/root/.cache \
+  faster-whisper-api:gpu
+```
+
+* `--gpus all` requires the **NVIDIA Container Toolkit**.
+* The cache volume (`/root/.cache`) speeds up model reuse.
+* If you hit cuDNN load errors, make sure the **host NVIDIA driver** is recent enough for CUDA 12.4 and that Docker sees the GPU (`docker run --gpus all nvidia/cuda:12.4.1-base-ubuntu24.04 nvidia-smi`).
+
+**Quick health check**
+
+```bash
+curl http://localhost:8000/health
+```
+
+---
 
 ### CPU-only
 
-If you don’t have NVIDIA GPUs, use a standard Python base image:
+**Dockerfile (CPU)**
 
 ```dockerfile
-FROM python:3.11-slim
-ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+FROM python:3.12-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /srv/app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
+
 COPY app ./app
 EXPOSE 8000
-CMD ["bash","-lc","export FW_DEVICE=cpu FW_COMPUTE=float32 && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1"]
+
+# Force CPU path
+ENV FW_DEVICE=cpu FW_COMPUTE=float32
+CMD ["uvicorn","app.main:app","--host","0.0.0.0","--port","8000","--workers","1"]
 ```
+
+**Build & Run (CPU)**
+
+```bash
+docker build -t faster-whisper-api:cpu -f Dockerfile.cpu .
+docker run -p 8000:8000 faster-whisper-api:cpu
+```
+
+---
+
+### Notes & Troubleshooting
+
+* **WSL2 (Windows):** enable *Docker Desktop → Settings → Resources → WSL Integration* for your distro. From inside WSL, `docker` must be on `PATH`.
+* **PyAV build error (“pkg-config is required for building PyAV”):** keep `pkg-config` installed (already included above). If needed, retry the build (network hiccups can make pip fall back to sdist).
+* **Slow first request:** the first call downloads the model and warms up the kernels. Use the cache volume and hit `/health` once on startup.
+* **Throughput control:** tune queue/concurrency with env vars:
+
+  * `FW_MAX_CONCURRENCY` — concurrent GPU jobs per container (default 1)
+  * `FW_QUEUE_MAXSIZE` — pending queue size
+  * `FW_RETRY_AFTER` — seconds for `503 Retry-After`
+* **Model/config via env:**
+
+  * `FW_MODEL` (e.g., `large-v3`, `medium`)
+  * `FW_DEVICE` (`cuda` or `cpu`)
+  * `FW_COMPUTE` (`float16` on GPU; `float32` or `int8_*` on CPU)
 
 ---
 
