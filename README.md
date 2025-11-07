@@ -27,7 +27,7 @@ Designed for **inference-only** on an internal server: upload an audio/video fil
 
 ---
 
-## Project Structure (reference)
+## Project Structure
 
 ```
 Faster-Whisper-API/
@@ -406,23 +406,6 @@ docker run -p 8000:8000 faster-whisper-api:cpu
   * `FW_MODEL` (e.g., `large-v3`, `medium`)
   * `FW_DEVICE` (`cuda` or `cpu`)
   * `FW_COMPUTE` (`float16` on GPU; `float32` or `int8_*` on CPU)
-
----
-
-## Security & Ops
-
-* Internal use recommended; add **token auth** if exposed.
-* Enforce upload size limits in app and reverse proxy (e.g., Nginx `client_max_body_size`).
-* If multiple clients share one host, consider a queue; one worker keeps the model hot.
-
----
-
-## Roadmap
-
-* [ ] Streaming/chunked transcription endpoint
-* [ ] Diarization hook (external)
-* [ ] Batch job mode & webhook callback
-* [ ] Optional language auto-detect
 
 ---
 

@@ -13,22 +13,20 @@ import ffmpeg
 from pydub import AudioSegment
 
 
-
 prefix = os.environ.get("CONDA_PREFIX")  # 없으면 None
-ffmpeg_override  = os.getenv("FW_FFMPEG")
+ffmpeg_override = os.getenv("FW_FFMPEG")
 ffprobe_override = os.getenv("FW_FFPROBE")
 
-_ffmpeg = (
-    ffmpeg_override
-    or (os.path.join(prefix, "bin", "ffmpeg") if prefix else shutil.which("ffmpeg") or "/usr/bin/ffmpeg")
+_ffmpeg = ffmpeg_override or (
+    os.path.join(prefix, "bin", "ffmpeg") if prefix else shutil.which("ffmpeg") or "/usr/bin/ffmpeg"
 )
-_ffprobe = (
-    ffprobe_override
-    or (os.path.join(prefix, "bin", "ffprobe") if prefix else shutil.which("ffprobe") or "/usr/bin/ffprobe")
+_ffprobe = ffprobe_override or (
+    os.path.join(prefix, "bin", "ffprobe") if prefix else shutil.which("ffprobe") or "/usr/bin/ffprobe"
 )
 
 AudioSegment.converter = _ffmpeg
-AudioSegment.ffprobe   = _ffprobe
+AudioSegment.ffprobe = _ffprobe
+
 
 @dataclass
 class _Defaults:

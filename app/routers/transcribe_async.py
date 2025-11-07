@@ -13,9 +13,12 @@ logger = logging.getLogger("app.timing")
 
 router = APIRouter()
 
-# ✅ query 파서를 의존성으로 명시
-def parse_query(q: str = Form('{"language":"ko","vad":true,"is_video":false,"word_timestamps":false}')) -> TranscribeQuery:
+
+def parse_query(
+    q: str = Form('{"language":"ko","vad":true,"is_video":false,"word_timestamps":false}'),
+) -> TranscribeQuery:
     return TranscribeQuery.model_validate_json(q)
+
 
 @router.post("/transcribe_async", status_code=202)
 async def transcribe_async(
@@ -40,7 +43,7 @@ async def transcribe_async(
     req_id = request.headers.get("X-Request-ID") or getattr(query, "request_id", None)
 
     job = create_job(req_id)
-    
+
     background_tasks.add_task(_worker, job.job_id, tmp_path, query)
 
     # 상대 경로(리버스프록시/포트 바뀌어도 안전). 절대 URL이 필요하면 request.url_for("...") 사용.
@@ -48,14 +51,15 @@ async def transcribe_async(
 
     body = {
         "job_id": job.job_id,
-        "status_url": status_path,           # 👈 바디에 포함
+        "status_url": status_path,  # 👈 바디에 포함
     }
     headers = {
-        "Location": status_path,             # 👈 202 Location 헤더
+        "Location": status_path,  # 👈 202 Location 헤더
         # 미들웨어가 이미 X-Request-ID를 붙이지만, 혹시 미들웨어 비활성화 시 대비
         "X-Request-ID": req_id or job.job_id,
     }
     return JSONResponse(content=body, headers=headers, status_code=202)
+
 
 @router.get("/jobs/{job_id}")
 def get_status(job_id: str):
@@ -78,9 +82,11 @@ async def _worker(job_id: str, tmp_path: Path, query: TranscribeQuery):
         )
 
         update_job(job_id, message="converting")
-        media = ap.demux(format="wav", start=query.start, end=query.end, export_to_disk=False) \
-            if query.is_video else \
-            ap.convert(start=query.start, end=query.end, export_to_disk=False)
+        media = (
+            ap.demux(format="wav", start=query.start, end=query.end, export_to_disk=False)
+            if query.is_video
+            else ap.convert(start=query.start, end=query.end, export_to_disk=False)
+        )
 
         svc = TranscriptionService(source=media, model=model, sr=settings.DEFAULT_SR, ch=settings.DEFAULT_CH)
 
@@ -90,7 +96,10 @@ async def _worker(job_id: str, tmp_path: Path, query: TranscribeQuery):
             language=query.language,
             vad_filter=query.vad,
             vad_parameters=dict(min_silence_duration_ms=300),
-            temperature=0.0, beam_size=6, best_of=1, patience=1.0,
+            temperature=0.0,
+            beam_size=6,
+            best_of=1,
+            patience=1.0,
             word_timestamps=query.word_timestamps,
             condition_on_previous_text=False,
         )
@@ -103,7 +112,9 @@ async def _worker(job_id: str, tmp_path: Path, query: TranscribeQuery):
                 txt = (seg.text or "").strip()
                 if txt:
                     all_text.append(txt)
-                    all_segments.append({"index": idx, "start": float(seg.start), "end": float(seg.end), "content": txt})
+                    all_segments.append(
+                        {"index": idx, "start": float(seg.start), "end": float(seg.end), "content": txt}
+                    )
                     idx += 1
                     if duration > 0:
                         update_job(job_id, progress=min(0.99, seg.end / duration))
@@ -113,7 +124,9 @@ async def _worker(job_id: str, tmp_path: Path, query: TranscribeQuery):
                 txt = (seg.text or "").strip()
                 if txt:
                     all_text.append(txt)
-                    all_segments.append({"index": idx, "start": float(seg.start), "end": float(seg.end), "content": txt})
+                    all_segments.append(
+                        {"index": idx, "start": float(seg.start), "end": float(seg.end), "content": txt}
+                    )
                     idx += 1
                     if duration > 0:
                         update_job(job_id, progress=min(0.99, seg.end / duration))
@@ -127,5 +140,7 @@ async def _worker(job_id: str, tmp_path: Path, query: TranscribeQuery):
     except Exception as e:
         update_job(job_id, status=JobStatus.error, ended_at=time.time(), message=str(e))
     finally:
-        try: os.unlink(tmp_path)
-        except: pass
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass

@@ -19,6 +19,7 @@ logging.basicConfig(
 def _mb(env_key: str, default_mb: int) -> int:
     return int(os.getenv(env_key, str(default_mb))) * 1024 * 1024
 
+
 MAX_FORM_MB = _mb("MAX_FORM_MB", 200)
 
 
@@ -26,7 +27,7 @@ app = FastAPI(
     title="FasterWhisperAPI",
     version="0.1.0",
     max_form_memory_size=MAX_FORM_MB,
-    )
+)
 
 
 app.add_middleware(

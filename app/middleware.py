@@ -5,6 +5,7 @@ from fastapi import Request, Response
 
 logger = logging.getLogger("app.timing")
 
+
 async def timing_middleware(request: Request, call_next):
     start = time.perf_counter()
     response: Response | None = None
@@ -25,5 +26,9 @@ async def timing_middleware(request: Request, call_next):
         status = getattr(response, "status_code", 500)
         logger.info(
             "TIMING req_id=%s method=%s path=%s status=%s dur_ms=%.1f",
-            req_id, request.method, request.url.path, status, dur_ms
+            req_id,
+            request.method,
+            request.url.path,
+            status,
+            dur_ms,
         )
