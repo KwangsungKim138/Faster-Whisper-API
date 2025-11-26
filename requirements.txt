@@ -5,5 +5,4 @@ python-multipart==0.0.9
 pydub==0.25.1
 ffmpeg-python==0.2.0
 python-dotenv==1.0.1
-faster-whisper==1.0.0
-python-multipart
+faster-whisper>=1.0.0
