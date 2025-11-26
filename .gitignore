@@ -41,6 +41,7 @@ MANIFEST
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
+logs/
 
 # Unit test / coverage reports
 htmlcov/
@@ -74,3 +75,10 @@ venv.bak/
 #  and can be added to the global gitignore or merged into this file. However, if you prefer, 
 #  you could uncomment the following to ignore the enitre vscode folder
 .vscode/
+
+# packging(for windows)
+vendor/
+vendor/wheelhouse/
+vendor/etc/
+bin/ffmpeg.exe
+bin/ffprobe.exe
