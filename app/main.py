@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +20,16 @@ logging.basicConfig(
 def _mb(env_key: str, default_mb: int) -> int:
     return int(os.getenv(env_key, str(default_mb))) * 1024 * 1024
 
+if sys.platform.startswith("win"):
+    ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    BIN_DIR = os.path.join(ROOT_DIR, "bin")
+
+    if os.path.exists(BIN_DIR):
+        # 현재 PATH에 bin 폴더를 맨 뒤에 추가
+        os.environ["PATH"] += os.pathsep + BIN_DIR
+        print(f"[INFO] (Windows) Added local bin to PATH: {BIN_DIR}")
+    else:
+        print(f"[WARNING] (Windows) Could not find bin directory at {BIN_DIR}")
 
 MAX_FORM_MB = _mb("MAX_FORM_MB", 200)
 
