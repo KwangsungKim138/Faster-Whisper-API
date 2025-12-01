@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, UploadFile, File, BackgroundTasks, Depends, HTTPException, Form
+from fastapi import APIRouter, Request, UploadFile, Query, File, BackgroundTasks, Depends, HTTPException, Form
 from fastapi.responses import JSONResponse
 from pathlib import Path
 import tempfile, os, asyncio, time, logging
@@ -26,6 +26,7 @@ async def transcribe_async(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     query: TranscribeQuery = Depends(parse_query),  # ← Ellipsis 대신 함수
+    request_id: str = Query(None),
 ):
     suffix = Path(file.filename).suffix or ".bin"
     with tempfile.NamedTemporaryFile(prefix="in_", suffix=suffix, delete=False) as tmp:
@@ -39,10 +40,9 @@ async def transcribe_async(
                 raise HTTPException(413, detail="File too large")
             tmp.write(chunk)
 
-    # 🔗 요청-잡 상관관계: 클라이언트가 보낸 X-Request-ID 우선 사용, 없으면 query.request_id, 둘 다 없으면 None
-    req_id = request.headers.get("X-Request-ID") or getattr(query, "request_id", None)
+    final_req_id = request_id or request.headers.get("X-Request-ID") or getattr(query, "request_id", None)
 
-    job = create_job(req_id)
+    job = create_job(final_req_id)
 
     background_tasks.add_task(_worker, job.job_id, tmp_path, query)
 
@@ -56,7 +56,7 @@ async def transcribe_async(
     headers = {
         "Location": status_path,  # 👈 202 Location 헤더
         # 미들웨어가 이미 X-Request-ID를 붙이지만, 혹시 미들웨어 비활성화 시 대비
-        "X-Request-ID": req_id or job.job_id,
+        "X-Request-ID": final_req_id or job.job_id,
     }
     return JSONResponse(content=body, headers=headers, status_code=202)
 

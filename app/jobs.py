@@ -28,7 +28,10 @@ _LOCK = threading.Lock()
 
 
 def create_job(request_id: Optional[str] = None) -> Job:
-    j = Job(job_id=str(uuid.uuid4()), status=JobStatus.queued, request_id=request_id)
+    actual_job_id = request_id if request_id else str(uuid.uuid4())
+    
+    j = Job(job_id=actual_job_id, status=JobStatus.queued, request_id=request_id)
+    
     with _LOCK:
         _STORE[j.job_id] = j
     return j
