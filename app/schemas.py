@@ -7,6 +7,7 @@ class Segment(BaseModel):
     start: float
     end: float
     content: str
+    avg_logprob: float
 
 
 class TranscribeResult(BaseModel):

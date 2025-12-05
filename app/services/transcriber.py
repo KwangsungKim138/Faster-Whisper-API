@@ -13,7 +13,7 @@ from faster_whisper import WhisperModel
 from app.services.audio_processor import AudioProcessor
 
 try:
-    from app.deps import get_model as _get_model
+    from app.dependencies import get_model as _get_model
 except Exception:
     _get_model = None
 
@@ -137,7 +137,7 @@ class TranscriptionService:
             if not txt:
                 continue
             all_text.append(txt)
-            all_segments.append({"index": i, "start": float(seg.start), "end": float(seg.end), "content": txt})
+            all_segments.append({"index": i, "avg_logprob": seg.avg_logprob, "start": float(seg.start), "end": float(seg.end), "content": txt})
 
         now = datetime.now()
         result = {

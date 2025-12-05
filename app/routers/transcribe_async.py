@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Request, UploadFile, Query, File, BackgroundTasks, Depends, HTTPException, Form
 from fastapi.responses import JSONResponse
 from pathlib import Path
@@ -113,7 +114,7 @@ async def _worker(job_id: str, tmp_path: Path, query: TranscribeQuery):
                 if txt:
                     all_text.append(txt)
                     all_segments.append(
-                        {"index": idx, "start": float(seg.start), "end": float(seg.end), "content": txt}
+                        {"index": idx, "start": float(seg.start), "end": float(seg.end), "content": txt, "avg_logprob": seg.avg_logprob,}
                     )
                     idx += 1
                     if duration > 0:
@@ -131,9 +132,11 @@ async def _worker(job_id: str, tmp_path: Path, query: TranscribeQuery):
                     if duration > 0:
                         update_job(job_id, progress=min(0.99, seg.end / duration))
 
+        now = datetime.now()
         result = {
             "language": query.language,
             "duration": duration,
+            "created_at": now.strftime("%Y-%m-%d %H:%M:%S.") + str(now.microsecond)[-3:],
             "result": {"text": " ".join(all_text).strip(), "segments": all_segments},
         }
         update_job(job_id, status=JobStatus.done, ended_at=time.time(), progress=1.0, message="done", result=result)
