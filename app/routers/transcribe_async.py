@@ -1,4 +1,5 @@
 from datetime import datetime
+import math
 from fastapi import APIRouter, Request, UploadFile, Query, File, BackgroundTasks, Depends, HTTPException, Form
 from fastapi.responses import JSONResponse
 from pathlib import Path
@@ -19,6 +20,15 @@ def parse_query(
     q: str = Form('{"language":"ko","vad":true,"is_video":false,"word_timestamps":false}'),
 ) -> TranscribeQuery:
     return TranscribeQuery.model_validate_json(q)
+
+def to_prob_int(avg_logprob) -> int:
+    # exp(-0.1) ≒ 0.904 -> 90
+    # 0~100 사이의 정수로 변환
+    try:
+        p = math.exp(avg_logprob) * 100
+        return int(min(100, max(0, round(p))))
+    except (ValueError, OverflowError):
+        return 0
 
 
 @router.post("/transcribe_async", status_code=202)
@@ -114,7 +124,7 @@ async def _worker(job_id: str, tmp_path: Path, query: TranscribeQuery):
                 if txt:
                     all_text.append(txt)
                     all_segments.append(
-                        {"index": idx, "start": float(seg.start), "end": float(seg.end), "content": txt, "avg_logprob": seg.avg_logprob,}
+                        {"index": idx, "start": float(seg.start), "end": float(seg.end), "content": txt, "avg_logprob": seg.avg_logprob, "prob": to_prob_int(seg.avg_logprob),}
                     )
                     idx += 1
                     if duration > 0:

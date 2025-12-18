@@ -8,6 +8,7 @@ class Segment(BaseModel):
     end: float
     content: str
     avg_logprob: float
+    prob: int
 
 
 class TranscribeResult(BaseModel):
@@ -16,7 +17,6 @@ class TranscribeResult(BaseModel):
     duration: float
     created_at: str
     result: dict  # {"text": str, "segments": List[Segment]}
-
 
 class TranscribeQuery(BaseModel):
     request_id: Optional[str] = None

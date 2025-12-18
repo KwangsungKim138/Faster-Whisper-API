@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-import uuid
+import math
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -73,6 +73,15 @@ class TranscriptionService:
         if isinstance(payload, Path):
             return payload
         return self._bytes_to_tmp_wav(payload)
+    
+    def to_prob_int(avg_logprob) -> int:
+        # exp(-0.1) ≒ 0.904 -> 90
+        # 0~100 사이의 정수로 변환
+        try:
+            p = math.exp(avg_logprob) * 100
+            return int(min(100, max(0, round(p))))
+        except (ValueError, OverflowError):
+            return 0
 
     # --------------------
     # 공개 API
@@ -137,7 +146,7 @@ class TranscriptionService:
             if not txt:
                 continue
             all_text.append(txt)
-            all_segments.append({"index": i, "avg_logprob": seg.avg_logprob, "start": float(seg.start), "end": float(seg.end), "content": txt})
+            all_segments.append({"index": i, "avg_logprob": seg.avg_logprob, "prob": self.to_prob_int(seg.avg_logprob), "start": float(seg.start), "end": float(seg.end), "content": txt})
 
         now = datetime.now()
         result = {

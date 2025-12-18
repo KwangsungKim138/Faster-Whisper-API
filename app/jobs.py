@@ -1,8 +1,7 @@
-# app/jobs.py
 from enum import Enum
 from pydantic import BaseModel
 from typing import Optional, Dict
-import time, uuid, threading
+import uuid, threading
 
 
 class JobStatus(str, Enum):
@@ -10,7 +9,6 @@ class JobStatus(str, Enum):
     processing = "processing"
     done = "done"
     error = "error"
-
 
 class Job(BaseModel):
     job_id: str

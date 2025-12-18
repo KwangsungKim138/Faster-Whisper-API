@@ -1,11 +1,9 @@
 import os
 import logging
-import asyncio
 import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 
 from .routers import transcribe_async
 from .middleware import timing_middleware
@@ -25,7 +23,6 @@ if sys.platform.startswith("win"):
     BIN_DIR = os.path.join(ROOT_DIR, "bin")
 
     if os.path.exists(BIN_DIR):
-        # 현재 PATH에 bin 폴더를 맨 뒤에 추가
         os.environ["PATH"] += os.pathsep + BIN_DIR
         print(f"[INFO] (Windows) Added local bin to PATH: {BIN_DIR}")
     else:
