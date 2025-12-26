@@ -28,7 +28,7 @@ if sys.platform.startswith("win"):
     else:
         print(f"[WARNING] (Windows) Could not find bin directory at {BIN_DIR}")
 
-MAX_FORM_MB = _mb("MAX_FORM_MB", 200)
+MAX_FORM_MB = _mb("MAX_FORM_MB", 10240)
 
 
 app = FastAPI(
